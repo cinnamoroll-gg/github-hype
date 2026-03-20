@@ -130,29 +130,28 @@ Roast them funny but not mean. Be playful and witty.`;
 
     // Handle different response formats
     if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
-      const content = data.choices[0].message.content.trim();
-      
-      // Qwen returns the JSON array as a string inside content
-      // Try to parse JSON directly first (plain JSON string)
+      let content = data.choices[0].message.content.trim();
+
+      // Strip <think>...</think> blocks (Qwen3 thinking mode)
+      content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+
+      // Extract JSON array — find first '[' and last ']'
+      const arrStart = content.indexOf('[');
+      const arrEnd = content.lastIndexOf(']');
+      if (arrStart !== -1 && arrEnd !== -1 && arrEnd > arrStart) {
+        content = content.slice(arrStart, arrEnd + 1);
+      }
+
+      // Strip markdown code fences
+      content = content.replace(/^```(?:json)?\s*/m, '').replace(/\s*```$/m, '').trim();
+
       try {
         roastLines = JSON.parse(content);
       } catch (parseError) {
-        // Try to parse JSON from content (might be wrapped in markdown)
-        let jsonStr = content;
-        if (content.startsWith('```json')) {
-          jsonStr = content.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-        } else if (content.startsWith('```')) {
-          jsonStr = content.replace(/^```\s*/, '').replace(/\s*```$/, '');
-        }
-        
-        try {
-          roastLines = JSON.parse(jsonStr);
-        } catch (parseError2) {
-          // Fallback: create a single roast line with the raw content
-          roastLines = [
-            { emoji: '🤣', text: content, color: 'magenta' }
-          ];
-        }
+        // Last resort fallback
+        roastLines = [
+          { emoji: '🔥', text: 'Roast unavailable — the model is too scared to talk.', color: 'red' }
+        ];
       }
     } else if (Array.isArray(data)) {
       roastLines = data;
