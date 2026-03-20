@@ -678,8 +678,19 @@ function renderHype(sections) {
 </body>
 </html>`;
 
+// Helper to get client IP from headers
+function getClientIP(req) {
+  return req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || 'unknown';
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
+  const startTime = Date.now();
+  const clientIP = getClientIP(req);
+  const queryString = url.searchParams.toString() ? `?${url.searchParams.toString()}` : '';
+  
+  // Log basic request info
+  console.log(`[${new Date().toISOString()}] ${req.method} ${url.pathname}${queryString} - IP: ${clientIP}`);
 
   if (url.pathname === '/api/hype' && req.method === 'GET') {
     const username = url.searchParams.get('username');
@@ -694,12 +705,18 @@ const server = http.createServer(async (req, res) => {
         fetchJSON(`https://api.github.com/users/${encodeURIComponent(username)}/repos?per_page=100&sort=stars`),
       ]);
       const hype = await generateHype(user, repos);
+      const duration = Date.now() - startTime;
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(hype));
+      // Log hype-specific info
+      console.log(`  /api/hype @${username} - ${duration}ms`);
     } catch (err) {
+      const duration = Date.now() - startTime;
       const status = err.message === 'User not found' ? 404 : 502;
       res.writeHead(status, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: err.message }));
+      // Log hype-specific info for errors too
+      console.log(`  /api/hype @${username} - ${duration}ms - ERROR: ${err.message}`);
     }
   } else if (url.pathname === '/') {
     res.writeHead(200, { 'Content-Type': 'text/html' });
