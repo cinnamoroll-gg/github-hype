@@ -5,12 +5,12 @@ A GitHub roast machine powered by local AI. Feed it a username, get a personaliz
 ## Stack
 
 - **Node.js** — zero-dependency HTTP server
-- **GitHub API** — public profile + repos (no auth needed)
+- **GitHub API** — public profile + repos (with optional auth for rate limiting)
 - **Qwen3-Coder-Next (local)** — 70B model running on-device via llama.cpp, generates roasts at runtime
 
 ## Run it
 
-Requires a local OpenAI-compatible inference server at `http://localhost:8081` (llama.cpp, Ollama, LM Studio, etc.) with a model loaded.
+Requires a local OpenAI-compatible inference server (llama.cpp, Ollama, LM Studio, etc.) with a model loaded.
 
 ```bash
 node server.js
@@ -18,6 +18,29 @@ node server.js
 ```
 
 Then visit `http://localhost:3000` and enter any GitHub username.
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `INFERENCE_BASE_URL` | `http://localhost:8081/v1` | Base URL of your OpenAI-compatible inference server |
+| `INFERENCE_MODEL` | `unsloth/Qwen3-Coder-Next-GGUF:Q6_K` | Model name to use for generating roasts |
+| `GITHUB_TOKEN` | (none) | Optional GitHub Personal Access Token to avoid rate limiting |
+
+### Example: Run with custom inference server
+
+```bash
+INFERENCE_BASE_URL=http://localhost:11434/v1 \
+INFERENCE_MODEL=llama3 \
+node server.js
+```
+
+### Example: Run with GitHub token for higher rate limits
+
+```bash
+GITHUB_TOKEN=ghp_your_token_here \
+node server.js
+```
 
 ## API
 

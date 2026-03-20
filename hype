@@ -1,0 +1,218 @@
+#!/usr/bin/env node
+
+const https = require('https');
+
+// --- Colors & formatting ---
+const c = {
+  reset: '\x1b[0m',
+  bold: '\x1b[1m',
+  dim: '\x1b[2m',
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  magenta: '\x1b[35m',
+  cyan: '\x1b[36m',
+  white: '\x1b[37m',
+  bgBlue: '\x1b[44m',
+  bgMagenta: '\x1b[45m',
+};
+
+function color(text, ...codes) {
+  return codes.join('') + text + c.reset;
+}
+
+// --- HTTP helper ---
+function fetchJSON(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, { headers: { 'User-Agent': 'hype-cli' } }, (res) => {
+      let data = '';
+      res.on('data', (chunk) => (data += chunk));
+      res.on('end', () => {
+        if (res.statusCode === 404) return reject(new Error('User not found'));
+        if (res.statusCode !== 200) return reject(new Error(`GitHub API returned ${res.statusCode}`));
+        try { resolve(JSON.parse(data)); } catch (e) { reject(e); }
+      });
+    }).on('error', reject);
+  });
+}
+
+// --- Roast/hype generators ---
+function generateHype(user, repos) {
+  const lines = [];
+
+  // Sanitize all user-provided strings for display only
+  const name = String(user.name || user.login || 'Mystery Dev');
+  const login = String(user.login || '???');
+  const bio = user.bio ? String(user.bio) : null;
+  const publicRepos = Number(user.public_repos) || 0;
+  const followers = Number(user.followers) || 0;
+  const following = Number(user.following) || 0;
+  const createdAt = user.created_at ? new Date(user.created_at) : null;
+  const location = user.location ? String(user.location) : null;
+  const company = user.company ? String(user.company) : null;
+  const hireable = user.hireable;
+
+  // Header
+  lines.push('');
+  lines.push(color('  ╔══════════════════════════════════════════════╗', c.bold, c.magenta));
+  lines.push(color('  ║', c.bold, c.magenta) + color('   🔥 HYPE MACHINE 🔥                        ', c.bold, c.yellow) + color('║', c.bold, c.magenta));
+  lines.push(color('  ╚══════════════════════════════════════════════╝', c.bold, c.magenta));
+  lines.push('');
+  lines.push(color(`  👤 ${name}`, c.bold, c.cyan) + color(` (@${login})`, c.dim));
+  if (bio) {
+    lines.push(color(`  📝 "${bio}"`, c.white));
+  }
+  if (location) lines.push(color(`  📍 ${location}`, c.dim));
+  if (company) lines.push(color(`  🏢 ${company}`, c.dim));
+  lines.push('');
+
+  // Stats bar
+  lines.push(color('  ── Stats ──────────────────────────────────────', c.dim));
+  lines.push(`  📦 ${color(String(publicRepos), c.bold, c.green)} repos  👥 ${color(String(followers), c.bold, c.yellow)} followers  👀 ${color(String(following), c.bold, c.blue)} following`);
+  lines.push('');
+
+  // Account age roast/hype
+  if (createdAt) {
+    const years = Math.floor((Date.now() - createdAt.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+    if (years >= 10) {
+      lines.push(color(`  🏆 OG alert! ${years} years on GitHub. This person was pushing code before it was cool.`, c.green));
+    } else if (years >= 5) {
+      lines.push(color(`  ⭐ ${years} years on GitHub — a seasoned veteran of the commit wars.`, c.green));
+    } else if (years >= 2) {
+      lines.push(color(`  🌱 ${years} years in — past the tutorial phase, entering the "I have opinions about tabs vs spaces" era.`, c.cyan));
+    } else {
+      lines.push(color(`  🐣 Fresh account! Only ${years} year(s) old. The README is still warm.`, c.yellow));
+    }
+  }
+
+  // Repo count roast/hype
+  if (publicRepos === 0) {
+    lines.push(color('  😶 Zero public repos. Either a lurker or operating entirely in the shadows. Respect.', c.red));
+  } else if (publicRepos < 5) {
+    lines.push(color(`  🤏 ${publicRepos} public repos — quality over quantity? Or just getting started? We'll be generous.`, c.yellow));
+  } else if (publicRepos < 20) {
+    lines.push(color(`  💻 ${publicRepos} repos — a solid collection. Not showing off, just getting things done.`, c.cyan));
+  } else if (publicRepos < 50) {
+    lines.push(color(`  🚀 ${publicRepos} repos?! This person codes like they're being chased.`, c.green));
+  } else {
+    lines.push(color(`  🤯 ${publicRepos} REPOS. Do you even sleep?! At this point GitHub should be paying YOU.`, c.bold, c.magenta));
+  }
+
+  // Follower roast/hype
+  if (followers === 0) {
+    lines.push(color('  👻 Zero followers. Coding in the void. A lone wolf. A digital hermit.', c.red));
+  } else if (followers < 10) {
+    lines.push(color(`  🫂 ${followers} followers — a tight-knit crew. Everyone starts somewhere!`, c.yellow));
+  } else if (followers < 100) {
+    lines.push(color(`  📈 ${followers} followers — building a reputation, one commit at a time.`, c.cyan));
+  } else if (followers < 1000) {
+    lines.push(color(`  🌟 ${followers} followers! A bonafide GitHub celebrity in the making.`, c.green));
+  } else {
+    lines.push(color(`  👑 ${followers} followers!! An absolute LEGEND. The mass follow this person.`, c.bold, c.yellow));
+  }
+
+  // Following ratio
+  if (followers > 0 && following > 0) {
+    const ratio = followers / following;
+    if (ratio > 10) {
+      lines.push(color('  💅 Follow ratio is elite. They don\'t follow back. They don\'t need to.', c.magenta));
+    } else if (ratio < 0.1) {
+      lines.push(color('  🫡 Following way more people than follow them — a generous community supporter (or desperate for a follow-back).', c.yellow));
+    }
+  }
+
+  // Hireable
+  if (hireable) {
+    lines.push(color('  💼 Marked as hireable — someone snag this person before they get mass followed!', c.green));
+  }
+
+  // Bio roast
+  if (!bio) {
+    lines.push(color('  🤷 No bio. Mystery is a vibe, but also... who ARE you?', c.yellow));
+  } else if (bio.length > 100) {
+    lines.push(color('  📜 That bio is basically a cover letter. We love the enthusiasm.', c.cyan));
+  }
+
+  // Top repos section
+  if (repos && repos.length > 0) {
+    lines.push('');
+    lines.push(color('  ── Top Repos ──────────────────────────────────', c.dim));
+
+    // Sort by stars
+    const topRepos = repos
+      .filter(r => !r.fork)
+      .sort((a, b) => (b.stargazers_count || 0) - (a.stargazers_count || 0))
+      .slice(0, 5);
+
+    if (topRepos.length === 0) {
+      lines.push(color('  🍴 All forks... a connoisseur of other people\'s code. No shame!', c.yellow));
+    } else {
+      for (const repo of topRepos) {
+        const stars = Number(repo.stargazers_count) || 0;
+        const repoName = String(repo.name || 'unnamed');
+        const lang = repo.language ? String(repo.language) : 'Mystery Language';
+        const desc = repo.description ? String(repo.description).slice(0, 60) : 'no description';
+        const starEmoji = stars > 100 ? '🌟' : stars > 10 ? '⭐' : '·';
+        lines.push(`  ${starEmoji} ${color(repoName, c.bold, c.cyan)} ${color(`(${lang})`, c.dim)} — ${color(String(stars), c.yellow)}★`);
+        lines.push(color(`    ${desc}`, c.dim));
+      }
+
+      // Language diversity
+      const langs = [...new Set(topRepos.map(r => r.language).filter(Boolean))];
+      if (langs.length >= 4) {
+        lines.push('');
+        lines.push(color(`  🌈 Polyglot alert! Spotted ${langs.length} different languages. This person refuses to be boxed in.`, c.magenta));
+      } else if (langs.length === 1) {
+        lines.push('');
+        lines.push(color(`  🎯 All in on ${String(langs[0])}. Loyalty is a virtue... or a comfort zone. Either way, respect.`, c.cyan));
+      }
+
+      // Star check
+      const totalStars = topRepos.reduce((sum, r) => sum + (Number(r.stargazers_count) || 0), 0);
+      if (totalStars === 0) {
+        lines.push(color('  💫 Zero stars across the board. Undiscovered genius or... code that only a mother could love?', c.yellow));
+      } else if (totalStars > 1000) {
+        lines.push(color(`  🏆 ${totalStars} total stars on top repos. Open source royalty right here!`, c.bold, c.green));
+      }
+    }
+  }
+
+  // Footer
+  lines.push('');
+  lines.push(color('  ══════════════════════════════════════════════', c.dim));
+  lines.push(color('  Powered by vibes & the GitHub API ✨', c.dim));
+  lines.push('');
+
+  return lines.join('\n');
+}
+
+// --- Main ---
+async function main() {
+  const username = process.argv[2];
+
+  if (!username) {
+    console.error(color('Usage: ./hype <github-username>', c.bold, c.red));
+    process.exit(1);
+  }
+
+  console.log(color(`\n  ⏳ Looking up @${username}...`, c.dim));
+
+  try {
+    const [user, repos] = await Promise.all([
+      fetchJSON(`https://api.github.com/users/${encodeURIComponent(username)}`),
+      fetchJSON(`https://api.github.com/users/${encodeURIComponent(username)}/repos?per_page=100&sort=stars`),
+    ]);
+
+    console.log(generateHype(user, repos));
+  } catch (err) {
+    if (err.message === 'User not found') {
+      console.error(color(`\n  ❌ User @${username} not found. Did they mass delete and flee?`, c.bold, c.red));
+    } else {
+      console.error(color(`\n  ❌ Error: ${err.message}`, c.bold, c.red));
+    }
+    process.exit(1);
+  }
+}
+
+main();

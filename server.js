@@ -1,9 +1,27 @@
 const http = require('http');
 const https = require('https');
 
+// Configuration from environment variables
+const INFERENCE_BASE_URL = process.env.INFERENCE_BASE_URL || 'http://localhost:8081/v1';
+const INFERENCE_MODEL = process.env.INFERENCE_MODEL || 'unsloth/Qwen3-Coder-Next-GGUF:Q6_K';
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+
+// Log configuration at startup
+console.log('🔥 HYPE MACHINE starting...');
+console.log(`  INFERENCE_BASE_URL: ${INFERENCE_BASE_URL}`);
+console.log(`  INFERENCE_MODEL: ${INFERENCE_MODEL}`);
+console.log(`  GITHUB_TOKEN: ${GITHUB_TOKEN ? 'configured (optional)' : 'not set (rate limits may apply)'}`);
+
 function fetchJSON(url) {
   return new Promise((resolve, reject) => {
-    https.get(url, { headers: { 'User-Agent': 'hype-web' } }, (res) => {
+    const options = { headers: { 'User-Agent': 'hype-web' } };
+    
+    // Add GitHub token if configured
+    if (GITHUB_TOKEN) {
+      options.headers.Authorization = `Bearer ${GITHUB_TOKEN}`;
+    }
+    
+    https.get(url, options, (res) => {
       let data = '';
       res.on('data', (chunk) => (data += chunk));
       res.on('end', () => {
@@ -79,13 +97,13 @@ Return ONLY valid JSON. No markdown formatting. No extra text. Just the JSON arr
 Roast them funny but not mean. Be playful and witty.`;
 
   try {
-    const response = await fetch('http://localhost:8081/v1/chat/completions', {
+    const response = await fetch(`${INFERENCE_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'unsloth/Qwen3-Coder-Next-GGUF:Q6_K',
+        model: INFERENCE_MODEL,
         messages: [
           {
             role: 'system',
@@ -694,4 +712,6 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(3000, () => {
   console.log('🔥 HYPE MACHINE running at http://localhost:3000');
+  console.log('🔥 Inference backend:', INFERENCE_BASE_URL);
+  console.log('🔥 Model:', INFERENCE_MODEL);
 });
