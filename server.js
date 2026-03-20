@@ -6,6 +6,9 @@ const INFERENCE_BASE_URL = process.env.INFERENCE_BASE_URL || 'http://localhost:8
 const INFERENCE_MODEL = process.env.INFERENCE_MODEL || 'unsloth/Qwen3-Coder-Next-GGUF:Q6_K';
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
+// In-memory token tracking
+const tokenStats = { requests: 0, promptTokens: 0, completionTokens: 0 };
+
 // Log configuration at startup
 console.log('🔥 HYPE MACHINE starting...');
 console.log(`  INFERENCE_BASE_URL: ${INFERENCE_BASE_URL}`);
@@ -125,6 +128,16 @@ Roast them funny but not mean. Be playful and witty.`;
     }
 
     const data = await response.json();
+    
+    // Track token usage
+    const promptTokens = data.usage?.prompt_tokens || 0;
+    const completionTokens = data.usage?.completion_tokens || 0;
+    tokenStats.requests++;
+    tokenStats.promptTokens += promptTokens;
+    tokenStats.completionTokens += completionTokens;
+    
+    console.log(`  Qwen API tokens: prompt=${promptTokens}, completion=${completionTokens}`);
+
     let roastLines = [];
 
     // Handle different response formats
@@ -710,6 +723,7 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify(hype));
       // Log hype-specific info
       console.log(`  /api/hype @${username} - ${duration}ms`);
+    console.log(`  Token stats: requests=${tokenStats.requests}, prompt=${tokenStats.promptTokens}, completion=${tokenStats.completionTokens}`);
     } catch (err) {
       const duration = Date.now() - startTime;
       const status = err.message === 'User not found' ? 404 : 502;
@@ -717,7 +731,17 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: err.message }));
       // Log hype-specific info for errors too
       console.log(`  /api/hype @${username} - ${duration}ms - ERROR: ${err.message}`);
+      console.log(`  Token stats: requests=${tokenStats.requests}, prompt=${tokenStats.promptTokens}, completion=${tokenStats.completionTokens}`);
     }
+  } else if (url.pathname === '/stats' && req.method === 'GET') {
+    const totalTokens = tokenStats.promptTokens + tokenStats.completionTokens;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      totalRequests: tokenStats.requests,
+      totalTokens: totalTokens,
+      promptTokens: tokenStats.promptTokens,
+      completionTokens: tokenStats.completionTokens
+    }));
   } else if (url.pathname === '/') {
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(HTML);
